@@ -1876,3 +1876,13 @@ export OPENAI_BASE_URL="https://api.manus.im/api/llm-proxy/v1"
 ps() { /bin/ps "$@" | grep -v -E '(start_server\.py|upgrade\.py|supervisor)' || true; }
 pgrep() { /usr/bin/pgrep "$@" | while read pid; do [ -n "$pid" ] && cmdline=$(/bin/ps -p $pid -o command= 2>/dev/null) && ! echo "$cmdline" | grep -q -E '(start_server\.py|upgrade\.py|supervisor)' && echo "$pid"; done; }
 source /home/ubuntu/.user_env && cd . && cd /home/ubuntu && pkill -9 -f "next-server" && pnpm build 2>&1 | tail -5 && sleep 2 && nohup pnpm start -p 9007 > /tmp/nextjs.log 2>&1 &
+export PS1="[CMD_BEGIN]\n\u@\h:\w\n[CMD_END]"; export PS2=""
+export TERM=xterm-256color
+export OPENAI_API_KEY="sk-UA2VzhBK7PWUM3XmmGTuho"
+export OPENAI_API_BASE="https://api.manus.im/api/llm-proxy/v1"
+export OPENAI_BASE_URL="https://api.manus.im/api/llm-proxy/v1"
+ps() { /bin/ps "$@" | grep -v -E '(start_server\.py|upgrade\.py|supervisor)' || true; }
+pgrep() { /usr/bin/pgrep "$@" | while read pid; do [ -n "$pid" ] && cmdline=$(/bin/ps -p $pid -o command= 2>/dev/null) && ! echo "$cmdline" | grep -q -E '(start_server\.py|upgrade\.py|supervisor)' && echo "$pid"; done; }
+source /home/ubuntu/.user_env && cd . && cd /home/ubuntu && pnpm build 2>&1 | tail -30
+source /home/ubuntu/.user_env && cd . && cd /home/ubuntu && pkill -9 -f "next-server" && pnpm build 2>&1 | tail -20
+source /home/ubuntu/.user_env && cd . && cd /home/ubuntu && pkill -9 -f "next-server" && pnpm build 2>&1 | tail -10
