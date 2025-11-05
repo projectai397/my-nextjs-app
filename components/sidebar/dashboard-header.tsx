@@ -14,6 +14,7 @@ import {
   User,
 } from "lucide-react"; // 👈 added User
 import { useSession, signOut } from "next-auth/react";
+import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 
 interface DashboardHeaderProps {
   onMenuToggle: () => void;
@@ -195,14 +196,7 @@ export function DashboardHeader({ onMenuToggle }: DashboardHeaderProps) {
           </Button>
 
           {/* Notifications */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="relative text-gray-300 hover:text-white h-8 w-8 md:h-10 md:w-10"
-          >
-            <Bell className="h-4 w-4 md:h-5 md:w-5" />
-            <span className="absolute -top-0.5 -right-0.5 md:-top-1 md:-right-1 h-2 w-2 md:h-3 md:w-3 bg-primary rounded-full" />
-          </Button>
+          <NotificationCenter userId={session?.user?.email || 'guest'} />
 
           {/* Settings + Logout dropdown */}
           <div

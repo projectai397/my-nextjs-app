@@ -41,6 +41,11 @@ import {
   Megaphone,
   ChevronRight,
   LogOut,
+  Bot,
+  Shield,
+  UserCheck,
+  Bell,
+  LayoutGrid,
 } from "lucide-react";
 
 import UserBadge from "@/hooks/userBadge";
@@ -100,9 +105,77 @@ const ALL_MENU_ITEMS: MenuItem[] = [
         icon: XCircle,
         link: "/users/negative-user",
         visibleFor: ["Master"]
-
+      },
+      {
+        id: "user-segments",
+        label: "User Segments",
+        icon: Users,
+        link: "/users/segments",
+      },
+      {
+        id: "bulk-operations",
+        label: "Bulk Operations",
+        icon: Layers,
+        link: "/users/bulk",
+      },
+      {
+        id: "user-timeline",
+        label: "Activity Timeline",
+        icon: History,
+        link: "/users/timeline",
       },
     ],
+  },
+  {
+    id: "ai",
+    label: "AI Features",
+    icon: Bot,
+    children: [
+      {
+        id: "ai-dashboard",
+        label: "AI Dashboard",
+        icon: Bot,
+        link: "/ai-dashboard",
+      },
+    ],
+  },
+  {
+    id: "security",
+    label: "Security",
+    icon: Shield,
+    children: [
+      {
+        id: "mfa",
+        label: "MFA Settings",
+        icon: Shield,
+        link: "/security/mfa",
+      },
+      {
+        id: "impersonate",
+        label: "User Impersonation",
+        icon: UserCheck,
+        link: "/security/impersonate",
+      },
+    ],
+  },
+  {
+    id: "settings",
+    label: "Settings",
+    icon: UserCog,
+    children: [
+      {
+        id: "notifications",
+        label: "Notifications",
+        icon: Bell,
+        link: "/settings/notifications",
+      },
+    ],
+  },
+  {
+    id: "dashboard-v2",
+    label: "Flexible Dashboard",
+    icon: LayoutGrid,
+    link: "/dashboard-v2",
   },
   {
     id: "payment",
