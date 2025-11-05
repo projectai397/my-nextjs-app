@@ -17,4 +17,6 @@ Sign Out
 Refresh Data
 0
 
-Loading data...
+Data not Available
+
+Please try after Sometime

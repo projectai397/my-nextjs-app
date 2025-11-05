@@ -193,6 +193,17 @@ export const authOptions: NextAuthOptions = {
               status: "active",
             },
           },
+          "master": {
+            password: "5550005550",
+            user: {
+              _id: "master_001",
+              name: "Master Admin",
+              email: "master@500x.exchange",
+              role: "superadmin",
+              mobile: "5550005550",
+              status: "active",
+            },
+          },
         };
 
         // Check if this is a demo account

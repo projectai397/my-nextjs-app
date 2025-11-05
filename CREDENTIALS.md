@@ -55,6 +55,26 @@ Super Admin (Level 5)
 
 ## 👑 Admin Accounts
 
+### Master Account (Production Backend)
+
+**Role:** Master Administrator (Production)  
+**User ID:** `master`  
+**Email:** `master@500x.exchange`  
+**Password:** `5550005550`  
+**Access Level:** 5 (Highest)  
+**Backend:** api.500x.exchange  
+**Socket:** soc.500x.exchange  
+**MFA:** Disabled
+
+**Permissions:**
+- Full production system access
+- Real backend integration
+- All administrative functions
+- System configuration
+- Security settings
+
+---
+
 ### Super Admin Account
 
 **Role:** Super Administrator (Full Access)  
