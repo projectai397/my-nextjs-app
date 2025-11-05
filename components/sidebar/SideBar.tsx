@@ -46,7 +46,6 @@ import {
   UserCheck,
   Bell,
   LayoutGrid,
-  Scale,
   BookOpen,
 } from "lucide-react";
 
