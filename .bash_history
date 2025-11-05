@@ -38,3 +38,5 @@ source /home/ubuntu/.user_env && cd . && cd /home/ubuntu && gh repo create my-ne
 source /home/ubuntu/.user_env && cd . && npm install -g vercel
 source /home/ubuntu/.user_env && cd . && vercel --version
 source /home/ubuntu/.user_env && cd . && cd /home/ubuntu && VERCEL_TOKEN="h3PrDivPt2WTWZ4NFAzin3Df" vercel --prod --yes --token h3PrDivPt2WTWZ4NFAzin3Df
+export PS1="[CMD_BEGIN]\n\u@\h:\w\n[CMD_END]"; export PS2=""
+export TERM=xterm-256color
