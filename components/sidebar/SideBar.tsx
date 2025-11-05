@@ -46,6 +46,8 @@ import {
   UserCheck,
   Bell,
   LayoutGrid,
+  Scale,
+  BookOpen,
 } from "lucide-react";
 
 import UserBadge from "@/hooks/userBadge";
@@ -137,6 +139,12 @@ const ALL_MENU_ITEMS: MenuItem[] = [
         icon: Bot,
         link: "/ai-dashboard",
       },
+      {
+        id: "compliance",
+        label: "Compliance Assistant",
+        icon: Scale,
+        link: "/compliance",
+      },
     ],
   },
   {
@@ -176,6 +184,12 @@ const ALL_MENU_ITEMS: MenuItem[] = [
     label: "Flexible Dashboard",
     icon: LayoutGrid,
     link: "/dashboard-v2",
+  },
+  {
+    id: "onboarding",
+    label: "Interactive Onboarding",
+    icon: BookOpen,
+    link: "/onboarding",
   },
   {
     id: "payment",
