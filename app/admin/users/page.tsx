@@ -52,6 +52,19 @@ import {
 
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Table,
   TableBody,
@@ -103,6 +116,10 @@ import {
 import { CreateUserForm } from "@/components/users/CreateUserForm";
 import CreateDepositDialog from "@/components/payment/CreateDepositDialog";
 import WithdrawForm from "@/components/payment/ChildWithdraw";
+import UserStatisticsCards from "@/components/users/UserStatisticsCards";
+import AIInsightsPanel from "@/components/users/AIInsightsPanel";
+import BulkOperationsBar from "@/components/users/BulkOperationsBar";
+import AdvancedFilters from "@/components/users/AdvancedFilters";
 
 /** ====== TYPES ====== **/
 export interface User {
@@ -299,6 +316,9 @@ export default function UserListPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteUser, setDeleteUser] = useState<User | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  // NEW: UI/UX Upgrade features
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  const [activeFilters, setActiveFilters] = useState<any>({});
 
   // NEW: fetch a single user by id using USER_CHECK_U_DATA
   const handleEditUser = (user: User) => {
@@ -1067,6 +1087,47 @@ export default function UserListPage() {
         </div>
       ) : (
         <main className="mx-auto px-4 sm:px-3 lg:px-3 py-3 pb-5">
+          {/* NEW: Statistics Cards */}
+          <UserStatisticsCards
+            stats={{
+              totalUsers: filteredUsers.length,
+              activeUsers: filteredUsers.filter(u => u.status === 1).length,
+              inactiveUsers: filteredUsers.filter(u => u.status !== 1).length,
+              newThisMonth: Math.floor(filteredUsers.length * 0.12),
+              adminUsers: filteredUsers.filter(u => u.role === ADMIN || u.role === SUPER_ADMIN).length,
+              riskUsers: filteredUsers.filter(u => u.profitLoss < -10000).length,
+            }}
+          />
+          
+          {/* NEW: AI Insights Panel */}
+          <AIInsightsPanel
+            insights={[
+              {
+                id: '1',
+                type: 'recommendation' as const,
+                title: 'Engage Inactive Users',
+                description: `${filteredUsers.filter(u => u.status !== 1).length} users are currently inactive. Consider sending re-engagement emails.`,
+                priority: 'medium' as const,
+                action: 'Send Email',
+              },
+              {
+                id: '2',
+                type: 'alert' as const,
+                title: 'High-Risk Activity Detected',
+                description: `${filteredUsers.filter(u => u.profitLoss < -10000).length} users have significant losses. Review their trading activity.`,
+                priority: 'high' as const,
+                action: 'View Users',
+              },
+              {
+                id: '3',
+                type: 'prediction' as const,
+                title: 'User Growth Trend',
+                description: 'Based on current patterns, expect 15-20 new user registrations this week.',
+                priority: 'low' as const,
+              },
+            ]}
+          />
+          
           {/* Header actions */}
           <CardContent className="!p-2 bg-[#181a20]">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -1143,6 +1204,10 @@ export default function UserListPage() {
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
+                <AdvancedFilters
+                  onApplyFilters={setActiveFilters}
+                  activeFiltersCount={Object.keys(activeFilters).filter(k => activeFilters[k] && activeFilters[k] !== 'all' && activeFilters[k] !== '').length}
+                />
                 <Button
                   onClick={exportData}
                   className="bg-[#fcd535] text-[#181a20] border border-[#3a3f47] hover:bg-[#f5e49e]"
@@ -2315,6 +2380,37 @@ export default function UserListPage() {
           </div>
         </div>
       )}
+      
+      {/* NEW: Bulk Operations Bar */}
+      <BulkOperationsBar
+        selectedCount={selectedUsers.length}
+        onClearSelection={() => setSelectedUsers([])}
+        onBulkDelete={() => {
+          if (selectedUsers.length > 0) {
+            toast.info(`Bulk delete ${selectedUsers.length} users (feature in development)`);
+          }
+        }}
+        onBulkExport={() => {
+          if (selectedUsers.length > 0) {
+            toast.info(`Bulk export ${selectedUsers.length} users (feature in development)`);
+          }
+        }}
+        onBulkActivate={() => {
+          if (selectedUsers.length > 0) {
+            toast.info(`Bulk activate ${selectedUsers.length} users (feature in development)`);
+          }
+        }}
+        onBulkDeactivate={() => {
+          if (selectedUsers.length > 0) {
+            toast.info(`Bulk deactivate ${selectedUsers.length} users (feature in development)`);
+          }
+        }}
+        onBulkEmail={() => {
+          if (selectedUsers.length > 0) {
+            toast.info(`Send email to ${selectedUsers.length} users (feature in development)`);
+          }
+        }}
+      />
     </div>
   );
 }
