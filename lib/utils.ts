@@ -125,6 +125,87 @@ export const authOptions: NextAuthOptions = {
           ipAddress: ip,
         };
 
+        // Demo accounts fallback for testing
+        const demoAccounts: Record<string, { password: string; user: any }> = {
+          "demo@tradingplatform.com": {
+            password: "Demo@2025!",
+            user: {
+              _id: "demo_admin_001",
+              name: "Demo Admin",
+              email: "demo@tradingplatform.com",
+              role: "admin",
+              mobile: "1234567890",
+              status: "active",
+            },
+          },
+          "superadmin@tradingplatform.com": {
+            password: "SuperAdmin@2025!",
+            user: {
+              _id: "superadmin_001",
+              name: "Super Admin",
+              email: "superadmin@tradingplatform.com",
+              role: "superadmin",
+              mobile: "1234567891",
+              status: "active",
+            },
+          },
+          "admin01@tradingplatform.com": {
+            password: "Admin01@2025!",
+            user: {
+              _id: "admin01_001",
+              name: "Admin 01",
+              email: "admin01@tradingplatform.com",
+              role: "admin",
+              mobile: "1234567892",
+              status: "active",
+            },
+          },
+          "manager01@tradingplatform.com": {
+            password: "Manager01@2025!",
+            user: {
+              _id: "manager01_001",
+              name: "Manager 01",
+              email: "manager01@tradingplatform.com",
+              role: "manager",
+              mobile: "1234567893",
+              status: "active",
+            },
+          },
+          "trader01@tradingplatform.com": {
+            password: "Trader01@2025!",
+            user: {
+              _id: "trader01_001",
+              name: "Trader 01",
+              email: "trader01@tradingplatform.com",
+              role: "trader",
+              mobile: "1234567894",
+              status: "active",
+            },
+          },
+          "user01@tradingplatform.com": {
+            password: "User01@2025!",
+            user: {
+              _id: "user01_001",
+              name: "User 01",
+              email: "user01@tradingplatform.com",
+              role: "user",
+              mobile: "1234567895",
+              status: "active",
+            },
+          },
+        };
+
+        // Check if this is a demo account
+        const demoAccount = demoAccounts[identifier];
+        if (demoAccount && demoAccount.password === password) {
+          console.log("✅ Demo account login successful:", identifier);
+          return {
+            user: demoAccount.user,
+            token: `demo_token_${Date.now()}`,
+          } as any;
+        }
+
+        // Try real API authentication
         try {
           const resp = await fetch(
             `${process.env.NEXT_PUBLIC_ADMIN_API_ENDPOINT}user/login`,
@@ -143,12 +224,13 @@ export const authOptions: NextAuthOptions = {
             throw new Error(data?.error || `Auth API returned ${resp.status}`);
           }
           const fdata = decryptData(data.data);
-          console.log(fdata);
+          console.log("✅ Real API login successful:", fdata);
           const apiToken = data.meta.token;
 
           return { user: fdata, token: apiToken } as any;
         } catch (e) {
-          console.log(e);
+          console.log("❌ Authentication failed:", e);
+          throw new Error("Invalid credentials. Please check your username and password.");
         }
       },
     }),
