@@ -47,6 +47,7 @@ import {
   User as UserIcon,
   ArrowDownCircle,
   ArrowUpCircle,
+  Trash2,
 } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
@@ -88,6 +89,7 @@ import {
   USER_SEARCH_LIST,
   USER_CHECK_U_DATA,
   USER_LOGO_EDIT,
+  DELETE_DEMO_USER,
 } from "@/constant/index";
 
 import { encryptData, decryptData, decryptData1 } from "@/hooks/crypto";
@@ -293,6 +295,10 @@ export default function UserListPage() {
   const [viewUserLoading, setViewUserLoading] = useState(false);
   const [viewUser, setViewUser] = useState<User | null>(null);
   const [isEditUserOpen, setIsEditUserOpen] = useState(false);
+  // Delete user
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteUser, setDeleteUser] = useState<User | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // NEW: fetch a single user by id using USER_CHECK_U_DATA
   const handleEditUser = (user: User) => {
@@ -760,6 +766,48 @@ export default function UserListPage() {
       setShareMessage("");
     } catch (e) {
       toast.error("Failed to share user information");
+    }
+  };
+
+  // Delete
+  const handleDeleteUser = (user: User) => {
+    setDeleteUser(user);
+    setDeleteDialogOpen(true);
+    setActiveTableMenu(null);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteUser) return;
+
+    try {
+      setIsDeleting(true);
+      const payload = encryptData({ userId: deleteUser.userId });
+      const response = await apiClient.post(
+        ADMIN_API_ENDPOINT + DELETE_DEMO_USER,
+        JSON.stringify({ data: payload }),
+        {
+          headers: {
+            Authorization: jwt_token,
+            "Content-Type": "application/json",
+            deviceType: deviceType,
+          },
+        }
+      );
+
+      if (response.data.statusCode === SUCCESS) {
+        toast.success("User deleted successfully!");
+        setDeleteDialogOpen(false);
+        setDeleteUser(null);
+        // Refresh user list
+        fetchUsers();
+      } else {
+        toast.error(response.data.message || "Failed to delete user");
+      }
+    } catch (error: any) {
+      console.error("Delete error:", error);
+      toast.error(error?.response?.data?.message || "Failed to delete user");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -1484,6 +1532,17 @@ export default function UserListPage() {
                                       <Share2 className="h-4 w-4 mr-2" />
                                       Share
                                     </button>
+
+                                    <button
+                                      className="flex items-center px-4 py-2 text-sm w-full text-left text-red-400 hover:bg-red-500/10"
+                                      onClick={() => {
+                                        setActiveTableMenu(null);
+                                        handleDeleteUser(user);
+                                      }}
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      Delete User
+                                    </button>
                                   </div>
                                 )}
                               </div>
@@ -2141,6 +2200,71 @@ export default function UserListPage() {
           fetchUsers();
         }}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="bg-[#1e2329] border-[#2a2f36]">
+          <DialogHeader>
+            <DialogTitle className="text-[#fcd535]">
+              Delete User
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
+              <Trash2 className="h-5 w-5 text-red-400" />
+              <div>
+                <p className="text-sm font-medium text-red-400">
+                  Warning: This action cannot be undone
+                </p>
+                <p className="text-xs text-[#848E9C] mt-1">
+                  This will permanently delete the user account
+                </p>
+              </div>
+            </div>
+
+            {deleteUser && (
+              <div className="space-y-2">
+                <p className="text-sm text-[#848E9C]">
+                  Are you sure you want to delete this user?
+                </p>
+                <div className="p-3 bg-[#252a30] rounded-lg border border-[#3a3f47]">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-[#fcd535]/10 flex items-center justify-center">
+                      <UserIcon className="h-5 w-5 text-[#fcd535]" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-white">{deleteUser.name}</p>
+                      <p className="text-xs text-[#848E9C]">
+                        {deleteUser.userName} • {deleteUser.phone}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteDialogOpen(false);
+                setDeleteUser(null);
+              }}
+              disabled={isDeleting}
+              className="border-[#3a3f47] text-[#848E9C]"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleDeleteConfirm}
+              disabled={isDeleting}
+              className="bg-red-500 hover:bg-red-600 text-white"
+            >
+              {isDeleting ? "Deleting..." : "Delete User"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Change Status */}
       {statusUserId && (
