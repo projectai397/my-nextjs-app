@@ -1,12 +1,16 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { fetchMarketNews, NewsItem as ApiNewsItem } from '@/lib/widgetApiService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Newspaper, TrendingUp, TrendingDown, Clock, ExternalLink, RefreshCw } from 'lucide-react';
 
-interface NewsItem {
+type NewsItem = ApiNewsItem;
+
+// Keep interface for backward compatibility
+interface _NewsItem {
   id: string;
   title: string;
   summary: string;
@@ -23,8 +27,23 @@ export default function NewsFeedWidget() {
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<string>('all');
 
-  // Mock news data
-  const mockNews: NewsItem[] = [
+  // Load news from API
+  const loadNews = async () => {
+    setLoading(true);
+    try {
+      const data = await fetchMarketNews(filter === 'all' ? undefined : filter);
+      setNews(data);
+    } catch (error) {
+      console.error('Failed to load news:', error);
+      // Fallback to mock data
+      setNews(getMockNews());
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Mock news data fallback
+  const getMockNews = (): NewsItem[] => [
     {
       id: '1',
       title: 'Bitcoin Surges Past $45,000 on ETF Approval Hopes',
@@ -95,15 +114,9 @@ export default function NewsFeedWidget() {
 
   useEffect(() => {
     loadNews();
-  }, []);
+  }, [filter]);
 
-  const loadNews = () => {
-    setLoading(true);
-    setTimeout(() => {
-      setNews(mockNews);
-      setLoading(false);
-    }, 500);
-  };
+
 
   const getTimeAgo = (date: Date) => {
     const minutes = Math.floor((Date.now() - date.getTime()) / 60000);

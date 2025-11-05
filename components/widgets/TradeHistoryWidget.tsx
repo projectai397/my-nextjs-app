@@ -1,12 +1,15 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { fetchTradeHistory, Trade as ApiTrade } from '@/lib/widgetApiService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { History, TrendingUp, TrendingDown, Clock, RefreshCw, Filter } from 'lucide-react';
 
-interface Trade {
+type Trade = ApiTrade;
+
+interface _Trade {
   id: string;
   symbol: string;
   type: 'buy' | 'sell';
@@ -26,36 +29,16 @@ export default function TradeHistoryWidget() {
     loadTrades();
   }, []);
 
-  const loadTrades = () => {
+  const loadTrades = async () => {
     setLoading(true);
-    
-    // Mock trade data
-    const symbols = ['BTC/USD', 'ETH/USD', 'SOL/USD', 'ADA/USD'];
-    const mockTrades: Trade[] = [];
-
-    for (let i = 0; i < 20; i++) {
-      const type = Math.random() > 0.5 ? 'buy' : 'sell';
-      const symbol = symbols[Math.floor(Math.random() * symbols.length)];
-      const price = Math.random() * 50000 + 1000;
-      const amount = Math.random() * 2;
-      
-      mockTrades.push({
-        id: `trade-${i}`,
-        symbol,
-        type,
-        price,
-        amount,
-        total: price * amount,
-        timestamp: new Date(Date.now() - Math.random() * 3600000),
-        status: 'completed'
-      });
+    try {
+      const data = await fetchTradeHistory();
+      setTrades(data);
+    } catch (error) {
+      console.error('Failed to load trades:', error);
+    } finally {
+      setLoading(false);
     }
-
-    // Sort by timestamp (newest first)
-    mockTrades.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-    
-    setTrades(mockTrades);
-    setLoading(false);
   };
 
   const getTimeAgo = (date: Date) => {

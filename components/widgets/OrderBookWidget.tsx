@@ -1,12 +1,15 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { fetchOrderBook, OrderBookEntry as ApiOrderBookEntry } from '@/lib/widgetApiService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { BookOpen, TrendingUp, TrendingDown, RefreshCw } from 'lucide-react';
 
-interface OrderBookEntry {
+type OrderBookEntry = ApiOrderBookEntry;
+
+interface _OrderBookEntry {
   price: number;
   amount: number;
   total: number;
@@ -25,40 +28,18 @@ export default function OrderBookWidget() {
     return () => clearInterval(interval);
   }, [symbol]);
 
-  const loadOrderBook = () => {
+  const loadOrderBook = async () => {
     setLoading(true);
-    
-    // Mock order book data
-    const basePrice = 45000;
-    const mockBids: OrderBookEntry[] = [];
-    const mockAsks: OrderBookEntry[]= [];
-
-    // Generate bids (buy orders)
-    for (let i = 0; i < 10; i++) {
-      const price = basePrice - (i * 10) - Math.random() * 5;
-      const amount = Math.random() * 2;
-      mockBids.push({
-        price,
-        amount,
-        total: price * amount
-      });
+    try {
+      const data = await fetchOrderBook(symbol);
+      setBids(data.bids);
+      setAsks(data.asks);
+      setSpread(data.spread);
+    } catch (error) {
+      console.error('Failed to load order book:', error);
+    } finally {
+      setLoading(false);
     }
-
-    // Generate asks (sell orders)
-    for (let i = 0; i < 10; i++) {
-      const price = basePrice + (i * 10) + Math.random() * 5;
-      const amount = Math.random() * 2;
-      mockAsks.push({
-        price,
-        amount,
-        total: price * amount
-      });
-    }
-
-    setBids(mockBids);
-    setAsks(mockAsks);
-    setSpread(mockAsks[0]?.price - mockBids[0]?.price || 0);
-    setLoading(false);
   };
 
   const getMaxTotal = () => {

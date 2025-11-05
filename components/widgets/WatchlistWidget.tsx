@@ -1,12 +1,15 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { fetchWatchlist, WatchlistItem as ApiWatchlistItem } from '@/lib/widgetApiService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Star, TrendingUp, TrendingDown, Plus, X, RefreshCw } from 'lucide-react';
 
-interface WatchlistItem {
+type WatchlistItem = ApiWatchlistItem;
+
+interface _WatchlistItem {
   symbol: string;
   name: string;
   price: number;
@@ -26,60 +29,16 @@ export default function WatchlistWidget() {
     return () => clearInterval(interval);
   }, []);
 
-  const loadWatchlist = () => {
+  const loadWatchlist = async () => {
     setLoading(true);
-    
-    // Mock watchlist data
-    const mockData: WatchlistItem[] = [
-      {
-        symbol: 'BTC/USD',
-        name: 'Bitcoin',
-        price: 45234.56,
-        change24h: 1234.56,
-        changePercent24h: 2.8,
-        volume24h: 28500000000,
-        marketCap: 885000000000
-      },
-      {
-        symbol: 'ETH/USD',
-        name: 'Ethereum',
-        price: 2345.67,
-        change24h: -45.23,
-        changePercent24h: -1.9,
-        volume24h: 12300000000,
-        marketCap: 282000000000
-      },
-      {
-        symbol: 'SOL/USD',
-        name: 'Solana',
-        price: 98.45,
-        change24h: 5.67,
-        changePercent24h: 6.1,
-        volume24h: 1200000000,
-        marketCap: 42000000000
-      },
-      {
-        symbol: 'ADA/USD',
-        name: 'Cardano',
-        price: 0.5234,
-        change24h: 0.0234,
-        changePercent24h: 4.7,
-        volume24h: 450000000,
-        marketCap: 18500000000
-      },
-      {
-        symbol: 'AAPL',
-        name: 'Apple Inc.',
-        price: 178.45,
-        change24h: -2.34,
-        changePercent24h: -1.3,
-        volume24h: 52000000,
-        marketCap: 2800000000000
-      }
-    ];
-
-    setWatchlist(mockData);
-    setLoading(false);
+    try {
+      const data = await fetchWatchlist();
+      setWatchlist(data);
+    } catch (error) {
+      console.error('Failed to load watchlist:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const updatePrices = () => {
