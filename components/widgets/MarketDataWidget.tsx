@@ -1,10 +1,14 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown, Activity } from 'lucide-react';
+import { TrendingUp, TrendingDown, Activity, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { fetchMarketData, MarketDataItem as ApiMarketDataItem } from '@/lib/widgetApiService';
 
-interface MarketDataItem {
+type MarketDataItem = ApiMarketDataItem;
+
+interface _MarketDataItem {
   symbol: string;
   name: string;
   price: number;
@@ -16,7 +20,34 @@ interface MarketDataItem {
 }
 
 export const MarketDataWidget: React.FC = () => {
-  const [marketData, setMarketData] = useState<MarketDataItem[]>([
+  const [marketData, setMarketData] = useState<MarketDataItem[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    loadMarketData();
+    const interval = setInterval(loadMarketData, 10000); // Update every 10 seconds
+    return () => clearInterval(interval);
+  }, []);
+
+  const loadMarketData = async () => {
+    setLoading(true);
+    try {
+      const data = await fetchMarketData();
+      if (data && data.length > 0) {
+        setMarketData(data.slice(0, 6)); // Show top 6
+      } else {
+        // Fallback to mock data
+        setMarketData(getMockMarketData());
+      }
+    } catch (error) {
+      console.error('Failed to load market data:', error);
+      setMarketData(getMockMarketData());
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getMockMarketData = (): MarketDataItem[] => [
     {
       symbol: 'BTC/USD',
       name: 'Bitcoin',
@@ -57,7 +88,8 @@ export const MarketDataWidget: React.FC = () => {
       high: 248.50,
       low: 241.20,
     },
-  ]);
+  ];
+
 
   // Simulate real-time updates
   useEffect(() => {
@@ -101,14 +133,20 @@ export const MarketDataWidget: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <Activity className="h-4 w-4 text-primary" />
-          <span className="text-sm font-medium">Live Market Data</span>
+          <Activity className="h-5 w-5 text-blue-500" />
+          <h3 className="font-semibold">Market Data</h3>
         </div>
-        <Badge variant="outline" className="text-xs">
-          Real-time
-        </Badge>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={loadMarketData}
+          disabled={loading}
+          className="h-8 w-8 p-0"
+        >
+          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+        </Button>
       </div>
 
       <div className="flex-1 overflow-auto space-y-3">

@@ -1,11 +1,38 @@
 "use client";
 
-import React from 'react';
-import { Wallet, TrendingUp, TrendingDown, PieChart } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Wallet, TrendingUp, TrendingDown, PieChart, RefreshCw } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
+import { Button } from '@/components/ui/button';
+import { fetchPortfolio, PortfolioSummary } from '@/lib/dashboardApiService';
 
 export const PortfolioWidget: React.FC = () => {
-  const portfolio = {
+  const [portfolio, setPortfolio] = useState<PortfolioSummary | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    loadPortfolio();
+    const interval = setInterval(loadPortfolio, 30000); // Update every 30 seconds
+    return () => clearInterval(interval);
+  }, []);
+
+  const loadPortfolio = async () => {
+    setLoading(true);
+    try {
+      const data = await fetchPortfolio();
+      setPortfolio(data);
+    } catch (error) {
+      console.error('Failed to load portfolio:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!portfolio) {
+    return <div className="h-full flex items-center justify-center">Loading...</div>;
+  }
+
+  const mockPortfolio = {
     totalValue: 125430.50,
     totalInvested: 100000.00,
     totalGain: 25430.50,
@@ -49,6 +76,7 @@ export const PortfolioWidget: React.FC = () => {
     ],
   };
 
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -60,9 +88,20 @@ export const PortfolioWidget: React.FC = () => {
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="flex items-center gap-2 mb-4">
-        <Wallet className="h-4 w-4 text-primary" />
-        <span className="text-sm font-medium">Portfolio Summary</span>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Wallet className="h-4 w-4 text-primary" />
+          <span className="text-sm font-medium">Portfolio Summary</span>
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={loadPortfolio}
+          disabled={loading}
+          className="h-8 w-8 p-0"
+        >
+          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+        </Button>
       </div>
 
       {/* Total Value */}
@@ -70,35 +109,23 @@ export const PortfolioWidget: React.FC = () => {
         <div className="text-3xl font-bold mb-1">
           {formatCurrency(portfolio.totalValue)}
         </div>
-        <div className="flex items-center gap-2 text-sm">
+        <div className="flex items-center gap-2 text-sm mt-1">
           <span
             className={`flex items-center gap-1 ${
-              portfolio.totalGain >= 0 ? 'text-green-600' : 'text-red-600'
+              portfolio.totalChange24h >= 0 ? 'text-green-600' : 'text-red-600'
             }`}
           >
-            {portfolio.totalGain >= 0 ? (
+            {portfolio.totalChange24h >= 0 ? (
               <TrendingUp className="h-3 w-3" />
             ) : (
               <TrendingDown className="h-3 w-3" />
             )}
-            {formatCurrency(Math.abs(portfolio.totalGain))} (
-            {portfolio.totalGainPercent >= 0 ? '+' : ''}
-            {portfolio.totalGainPercent.toFixed(2)}%)
+            {portfolio.totalChange24h >= 0 ? '+' : ''}
+            {formatCurrency(Math.abs(portfolio.totalChange24h))} (
+            {portfolio.totalChangePercent24h >= 0 ? '+' : ''}
+            {portfolio.totalChangePercent24h.toFixed(2)}%)
           </span>
-          <span className="text-muted-foreground">All Time</span>
-        </div>
-        <div className="flex items-center gap-2 text-sm mt-1">
-          <span
-            className={`flex items-center gap-1 ${
-              portfolio.dayChange >= 0 ? 'text-green-600' : 'text-red-600'
-            }`}
-          >
-            {portfolio.dayChange >= 0 ? '+' : ''}
-            {formatCurrency(Math.abs(portfolio.dayChange))} (
-            {portfolio.dayChangePercent >= 0 ? '+' : ''}
-            {portfolio.dayChangePercent.toFixed(2)}%)
-          </span>
-          <span className="text-muted-foreground">Today</span>
+          <span className="text-muted-foreground">24h</span>
         </div>
       </div>
 
