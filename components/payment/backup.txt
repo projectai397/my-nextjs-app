@@ -1,0 +1,779 @@
+"use client";
+
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import apiClient from "@/lib/axiosInstance";
+
+import Select, { SingleValue } from "react-select";
+import { v4 as uuidv4 } from "uuid";
+import { useSession } from "next-auth/react";
+
+// --- shadcn/ui ---
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+
+// --- your app constants & utils ---
+import {
+  ADMIN_API_ENDPOINT,
+  ADD_DEPOSIT,
+  BANK_DETAILS_LIST,
+  USER_ALL_CHILD_LIST,
+  BANK_DETAILS_GET_BANK_FOR_ATS,
+  SUCCESS,
+} from "@/constant/index";
+import { encryptData, decryptData } from "@/hooks/crypto";
+import { toastError, toastSuccess } from "@/hooks/toastMsg";
+import { toast } from "sonner";
+import axios from "axios";
+import AsyncSelect from "react-select/async";
+
+// ---------- Types ----------
+type Option = { value: string; label: string };
+type Props = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess?: () => void; // Optional: Refetch list after success
+  defaultUser?: Option | { userId: string; name: string; phone?: string };
+};
+
+type AtsBankData = {
+  title?: string;
+  account_holder_name?: string;
+  account_number?: string;
+  ifsc_code?: string;
+  upi_address?: string;
+  [k: string]: any;
+};
+
+type DeviceInfo = {
+  deviceType: "desktop" | "mobile" | "web";
+  browser: string;
+  userAgent: string;
+  newDeviceId: string;
+  ip: string;
+};
+
+type FormState = {
+  userId: Option | null;
+  bankDetailsId: Option | null;
+  userName: string;
+  amount: number | "";
+  transactionId: string;
+  status: 1 | 3; // 1=Approved, 3=Dis-Approved
+  paymentRequestType: "credit";
+  comment?: string;
+};
+
+const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png"];
+
+export default function CreateDepositDialog({
+  open,
+  onOpenChange,
+  onSuccess,
+  defaultUser,
+}: Props) {
+  const { data: session, status } = useSession();
+
+  const token = (session as any)?.accessToken as string | undefined;
+  const deviceTypeFromSession = ((session?.user as any)?.deviceType as string | undefined) ?? "web";
+  const authenticatedUserId = (session?.user as any)?.userId as
+    | string
+    | undefined;
+  const authenticatedRole = (session?.user as any)?.roleName as
+    | string
+    | undefined;
+  const authenticatedUserName = (session?.user as any)?.userName as
+    | string
+    | undefined;
+
+  // ---------- Local state ----------
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isFindingBank, setIsFindingBank] = useState(false);
+  const [image, setImage] = useState<File | null>(null);
+  const [bankListData, setBankListData] = useState<Option[]>([]);
+  const [userListData, setUserListData] = useState<Option[]>([]);
+  const [userAtsBankData, setUserAtsBankData] = useState<AtsBankData>({});
+
+  const initialForm: FormState = useMemo(
+    () => ({
+      userId: null,
+      bankDetailsId: null,
+      userName: authenticatedUserName || "",
+      amount: "",
+      transactionId: "",
+      status: 2 as unknown as 1 | 3, // Default (2) = pending on server
+      paymentRequestType: "credit",
+      comment: "",
+    }),
+    [authenticatedUserName]
+  );
+  const [form, setForm] = useState<FormState>(initialForm);
+
+  // ---------- Helpers ----------
+  const setField = <K extends keyof FormState>(key: K, value: any) => {
+    setForm((p) => ({ ...p, [key]: value }));
+  };
+
+  const clearFile = () => {
+    setImage(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  // ---------- Device info ----------
+  const getDeviceInfo = async (): Promise<DeviceInfo> => {
+    const userAgent = navigator.userAgent;
+    let detectedDeviceType: "desktop" | "mobile" | "web" = /Mobi|Android/i.test(
+      userAgent
+    )
+      ? "mobile"
+      : "desktop";
+    let browser = "Unknown";
+    if (userAgent.includes("Chrome")) browser = "Chrome";
+    else if (userAgent.includes("Firefox")) browser = "Firefox";
+    else if (userAgent.includes("Safari")) browser = "Safari";
+    else if (userAgent.includes("Edge")) browser = "Edge";
+
+    let newDeviceId = localStorage.getItem("deviceId") || "";
+    if (!newDeviceId) {
+      newDeviceId = uuidv4();
+      localStorage.setItem("deviceId", newDeviceId);
+    }
+    let deviceTypeLocal =
+      (localStorage.getItem("deviceType") as "desktop" | "mobile" | "web") ||
+      "";
+    if (!deviceTypeLocal) {
+      deviceTypeLocal = detectedDeviceType;
+      localStorage.setItem("deviceType", deviceTypeLocal);
+    }
+
+    let ip = "";
+    try {
+      const res = await axios.get("https://api.ipify.org?format=json");
+      ip = res.data?.ip || "";
+    } catch {
+      // ignore
+    }
+
+    return {
+      deviceType:
+        (deviceTypeFromSession as any) || deviceTypeLocal || "desktop",
+      browser,
+      userAgent,
+      newDeviceId,
+      ip,
+    };
+  };
+
+  // ---------- Data fetchers ----------
+  const fetchBankList = async () => {
+    try {
+      if (!token || !authenticatedUserId || !authenticatedRole) return;
+      const payload = encryptData({
+        userId: authenticatedUserId,
+        role: authenticatedRole,
+        page: 1,
+        limit: 200,
+      });
+      const { data } = await apiClient.post(
+        BANK_DETAILS_LIST,
+        JSON.stringify({ data: payload })
+      );
+
+      if (data.statusCode === SUCCESS) {
+        const rdata = decryptData(data.data) as Array<{
+          bankDetailsId: string;
+          accountNumber: string;
+          bankName: string;
+          accountHolderName: string;
+        }>;
+        const options: Option[] = rdata.map((b) => ({
+          value: String(b.bankDetailsId ?? ""),
+          label: `${b.accountNumber}, ${b.bankName}, ${b.accountHolderName}`,
+        }));
+        setBankListData(options);
+      } else {
+        toastError(data.message);
+      }
+    } catch (err: any) {
+      toastError(err?.response?.data?.message || "Failed to load banks");
+    }
+  };
+
+  const fetchUsers = async () => {
+    try {
+      if (!token || !authenticatedRole) return;
+      const payload = encryptData({
+        role: authenticatedRole,
+        page: 0,
+        limit: 1000,
+      });
+      const { data } = await apiClient.post(
+        USER_ALL_CHILD_LIST,
+        JSON.stringify({ data: payload })
+      );
+
+      if (data.statusCode === SUCCESS) {
+        const rdata = decryptData(data.data);
+        setUserListData(
+          rdata.map((u: any) => ({
+            value: String(u.userId ?? ""),
+            label: String(u.userName || u.userId),
+          }))
+        );
+      } else {
+        toastError(data.message);
+      }
+    } catch (err: any) {
+      toastError(err?.response?.data?.message || "Failed to load users");
+    }
+  };
+
+  const liveSearchUsers = async (inputValue: string) => {
+    if (!inputValue || inputValue.length < 3) return;
+    try {
+      if (!token || !authenticatedRole) return;
+      const payload = encryptData({
+        search: inputValue,
+        role: authenticatedRole,
+        page: 0,
+        limit: 1000,
+      });
+      const { data } = await apiClient.post(
+        USER_ALL_CHILD_LIST,
+        JSON.stringify({ data: payload })
+      );
+
+      if (data.statusCode === SUCCESS) {
+        const rdata = decryptData(data.data);
+        // console.log("live search users", rdata);
+        if (rdata.length === 1) {
+          const only = rdata[0];
+          const option: Option = {
+            value: only.userId ?? "",
+            label: only.phone || only.userName || "", // Ensure label is a string
+          };
+          setUserListData([option]);
+          setField("userId", option); // Ensure `userId` is an object with `value` and `label`
+        } else {
+          setUserListData(
+            rdata.map((u: any) => ({
+              value: u.userId,
+              label: u.userName || u.userId, // Ensure label is a string
+            }))
+          );
+        }
+      } else {
+        toastError(data.message);
+      }
+    } catch (err: any) {
+      toastError(err?.response?.data?.message || "User search failed");
+    }
+  };
+
+  const getAtsBankForAmount = async () => {
+    try {
+      if (!token) return;
+      if (!form.amount || Number(form.amount) <= 0) {
+        toastError("Enter a valid amount first.");
+        return;
+      }
+      setIsFindingBank(true);
+      const payload = encryptData({ amount: Number(form.amount) });
+      const { data } = await apiClient.post(
+        BANK_DETAILS_GET_BANK_FOR_ATS,
+        JSON.stringify({ data: payload })
+      );
+      if (data.statusCode === SUCCESS) {
+        const res = decryptData(data.data) as AtsBankData;
+        setUserAtsBankData(res);
+      } else {
+        toastError(data.message);
+      }
+    } catch (err: any) {
+      toastError(err?.response?.data?.message || "Failed to fetch ATS bank");
+    } finally {
+      setIsFindingBank(false);
+    }
+  };
+ const fetchBankDataFromAPI = async () => {
+        try {
+            let data = encryptData({
+                "userId": authenticatedUserId,
+                "role": authenticatedRole,
+                "page": 1,
+                "limit": 200,
+            });
+            data = JSON.stringify({data: data});
+            apiClient
+                .post(BANK_DETAILS_LIST, data)
+                .then((response) => {
+                    if (response.data.statusCode == SUCCESS) {
+                        const rdata = decryptData(response.data.data)
+                        const formattedOptions = rdata.map((item: any) => ({
+                            value: item.bankDetailsId,
+                            label: item.accountNumber + ', ' + item.bankName + ', ' + item.accountHolderName
+                        }));
+                        setBankListData(formattedOptions);
+                    }
+                })
+                .catch((error) => {
+                    console.error("Login error:", error); // Handle error
+                });
+        } catch (error) {
+            console.error('Error fetching data:', error);
+        }
+    };
+  // ---------- Submit ----------
+  const handleSubmit = async () => {
+    try {
+      if (!token) {
+        toastError("Missing auth token.");
+        return;
+      }
+      if (!form.userId?.value) {
+        return toast.error("Please select a user");
+      } else {
+        setField("userName", form.userName?.label); // Automatically set userName when user is selected
+      }
+
+      if (!form.amount || Number(form.amount) <= 0)
+        return toastError("Enter valid amount");
+      if (!form.transactionId) return toastError("Transaction ID is required");
+      if (!(form.status === 1 || form.status === 3))
+        return toastError("Select a status");
+
+      const dev = await getDeviceInfo();
+
+      const fd = new FormData();
+      if (image) fd.append("image", image);
+
+      const payload = encryptData({
+        userId: (form.userName as any).value,
+        // bankDetailsId: form.bankDetailsId?.value || "",
+        atsBankDetails: userAtsBankData || {},
+        parentId: authenticatedUserId, // Make sure parentId is populated
+        userName: (form.userName as any).label, // Ensure userName is populated
+        amount: Number(form.amount),
+        transactionId: form.transactionId,
+        paymentRequestType: form.paymentRequestType, // "credit"
+        status: form.status,
+        comment: form.comment || "",
+        browser: dev.browser,
+        userAgent: dev.userAgent,
+        deviceId: dev.newDeviceId,
+        deviceType: dev.deviceType,
+        ipAddress: dev.ip,
+      });
+
+      fd.append("data", payload);
+
+      setIsSubmitting(true);
+      const { data } = await apiClient.post(ADD_DEPOSIT, fd);
+
+      if (data.statusCode === SUCCESS) {
+        toastSuccess(data?.meta?.message || "Deposit added");
+        // reset & close
+        resetForm();
+        onOpenChange(false);
+        onSuccess?.();
+      } else {
+        toastError(data.message);
+      }
+    } catch (err: any) {
+      toastError(err?.response?.data?.message || "Submit failed");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  const MIN_CHARS = 2;
+
+  // small debounce helper
+  function debounce<T extends (...args: any[]) => Promise<Option[]>>(
+    fn: T,
+    ms = 300
+  ) {
+    let t: any;
+    return (inputValue: string) => {
+      return new Promise<Option[]>((resolve) => {
+        clearTimeout(t);
+        t = setTimeout(async () => {
+          const result = await fn(inputValue);
+          resolve(result);
+        }, ms);
+      });
+    };
+  }
+  const loadUserOptions = debounce(
+    async (inputValue: string): Promise<Option[]> => {
+      const q = inputValue.trim();
+      if (q.length < MIN_CHARS) return [];
+
+      try {
+        const payload = encryptData({
+          search: q,
+          role: authenticatedRole,
+          page: 0,
+          limit: 1000,
+        });
+
+        const { data } = await apiClient.post(
+          USER_ALL_CHILD_LIST,
+          JSON.stringify({ data: payload })
+        );
+
+        if (data.statusCode !== SUCCESS) return [];
+
+        const rdata = decryptData(data.data) as Array<any>;
+
+        // ensure label is a string
+        return (rdata || []).map((u) => ({
+          value: String(u.userId ?? ""),
+          label: String(u.userName || u.phone || u.userId || ""),
+        }));
+      } catch {
+        return [];
+      }
+    },
+    350
+  );
+  // ---------- Reset ----------
+  const resetForm = () => {
+    setForm(initialForm);
+    clearFile();
+    setUserAtsBankData({});
+  };
+
+  // ---------- Effects ----------
+  useEffect(() => {
+    if (!open) return;
+    if (status !== "authenticated") return;
+    // load banks & users when dialog opens
+    fetchBankList();
+    fetchUsers();
+  }, [open, status]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!open || !defaultUser) return;
+
+    const opt: Option =
+      "value" in defaultUser
+        ? defaultUser
+        : {
+            value: String(defaultUser.userId ?? ""),
+            label: `${defaultUser.name}${
+              defaultUser.phone ? ` (${defaultUser.phone})` : ""
+            }`,
+          };
+
+    setForm((p) => ({ ...p, userId: opt }));
+  }, [open, defaultUser]);
+
+  // ---------- Render ----------
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) =>
+        o ? onOpenChange(true) : (resetForm(), onOpenChange(false))
+      }
+    >
+      <DialogContent
+        className="max-w-[820px]"
+        style={{ backgroundColor: "#1e2329" }}
+      >
+        <DialogHeader>
+          <DialogTitle style={{ color: "#fcd535" }}>Deposit</DialogTitle>
+        </DialogHeader>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Bank (hidden if ATS-mode) */}
+
+          {/* <div>
+            <Label style={{ color: "#fcd535" }}>
+              Select Bank <span className="text-red-500">*</span>
+            </Label>
+            <Select
+              inputId="bankDetailsId"
+              value={form.bankDetailsId}
+              onChange={(opt: SingleValue<Option>) =>
+                setField("bankDetailsId", opt || null)
+              }
+              options={bankListData}
+              className="mt-1"
+              styles={{
+                control: (base) => ({
+                  ...base,
+                  backgroundColor: "#2a2f36",
+                  borderColor: "#3a3f46",
+                  color: "#fff",
+                }),
+                singleValue: (base) => ({ ...base, color: "#fff" }),
+                menu: (base) => ({ ...base, backgroundColor: "#2a2f36" }),
+                option: (base, state) => ({
+                  ...base,
+                  backgroundColor: state.isFocused ? "#3a3f46" : "#2a2f36",
+                  color: "#fff",
+                }),
+              }}
+            />
+          </div> */}
+
+          {/* Amount (+ ATS “Find Bank”) */}
+          <div>
+            <div className="flex items-center justify-between">
+              <Label style={{ color: "#fcd535" }}>
+                Deposit Amount <span className="text-red-500">*</span>
+              </Label>
+              {/* {depositWithdrawAtsSystem && (
+                <Button
+                  size="sm"
+                  onClick={getAtsBankForAmount}
+                  disabled={
+                    isFindingBank || !form.amount || Number(form.amount) <= 0
+                  }
+                  style={{ backgroundColor: "#fcd535", color: "#181a20" }}
+                >
+                  {isFindingBank ? "Finding…" : "Find Bank"}
+                </Button>
+              )} */}
+            </div>
+            <Input
+              id="amount"
+              type="number"
+              value={form.amount}
+              onChange={(e) =>
+                setField(
+                  "amount",
+                  e.target.value === "" ? "" : Number(e.target.value)
+                )
+              }
+              placeholder="Enter Deposit Amount"
+              className="mt-1"
+              style={{
+                backgroundColor: "#2a2f36",
+                borderColor: "#3a3f46",
+                color: "#ffffff",
+              }}
+            />
+          </div>
+
+          {/* ATS bank detail preview */}
+          {/* {depositWithdrawAtsSystem && userAtsBankData?.title && (
+            <div className="md:col-span-2">
+              <div
+                className="rounded-xl p-3"
+                style={{ background: "#2a2f36", border: "1px solid #3a3f46" }}
+              >
+                <div className="text-sm" style={{ color: "#fcd535" }}>
+                  Bank Name:{" "}
+                  <strong className="text-white">
+                    {userAtsBankData.title}
+                  </strong>
+                </div>
+                <div className="text-sm text-white">
+                  A/C Holder:{" "}
+                  <strong>{userAtsBankData.account_holder_name}</strong>
+                </div>
+                <div className="text-sm text-white">
+                  A/C No: <strong>{userAtsBankData.account_number}</strong>
+                </div>
+                <div className="text-sm text-white">
+                  IFSC: <strong>{userAtsBankData.ifsc_code}</strong>
+                </div>
+                <div className="text-sm text-white">
+                  UPI ID: <strong>{userAtsBankData.upi_address}</strong>
+                </div>
+              </div>
+            </div>
+          )} */}
+
+          {/* User */}
+          <div className="md:col-span-2">
+            <Label style={{ color: "#fcd535" }}>
+              Select User <span className="text-red-500">*</span>
+            </Label>
+            <AsyncSelect
+              inputId="userName"
+              cacheOptions
+              defaultOptions={false} // don’t preload; search as you type
+              loadOptions={loadUserOptions} // our debounced loader
+              value={form.userName} // must be { value, label } or null
+              onChange={(opt) => setField("userName", (opt as any) || null)}
+              onInputChange={(val, meta) =>
+                meta.action === "input-change" ? val : ""
+              }
+              isClearable
+              isSearchable
+              placeholder={`Type at least ${MIN_CHARS} characters...`}
+              className="mt-1"
+              styles={{
+                control: (base) => ({
+                  ...base,
+                  backgroundColor: "#2a2f36", // background color for the control
+                  borderColor: "#3a3f46", // border color
+                  color: "#fff", // text color for the control
+                  fontSize: "14px", // Ensures the text is legible
+                }),
+                input: (base) => ({
+                  ...base,
+                  color: "#fff", // Ensures the typed text remains white
+                }),
+                singleValue: (base) => ({
+                  ...base,
+                  color: "#fff", // Ensuring text (selected option) remains white
+                }),
+                menu: (base) => ({
+                  ...base,
+                  backgroundColor: "#2a2f36", // background color for dropdown menu
+                }),
+                option: (base, state) => ({
+                  ...base,
+                  backgroundColor: state.isFocused ? "#3a3f46" : "#2a2f36", // background color for option when focused
+                  color: "#fff", // text color for options (white)
+                }),
+                placeholder: (base) => ({
+                  ...base,
+                  color: "#fff", // placeholder text color should be white
+                }),
+              }}
+              loadingMessage={() => "Searching..."}
+              noOptionsMessage={({ inputValue }) =>
+                inputValue.trim().length < MIN_CHARS
+                  ? `Type at least ${MIN_CHARS} characters`
+                  : "No users found"
+              }
+            />
+          </div>
+
+          {/* Transaction ID */}
+          <div>
+            <Label style={{ color: "#fcd535" }}>
+              Transaction ID <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="transactionId"
+              value={form.transactionId}
+              onChange={(e) => setField("transactionId", e.target.value)}
+              placeholder="Enter Transaction ID"
+              className="mt-1"
+              style={{
+                backgroundColor: "#2a2f36",
+                borderColor: "#3a3f46",
+                color: "#ffffff",
+              }}
+            />
+          </div>
+
+          {/* Upload screenshot */}
+          <div>
+            <Label style={{ color: "#fcd535" }}>Upload Screenshot</Label>
+            <Input
+              ref={fileInputRef}
+              type="file"
+              accept={ACCEPTED_IMAGE_TYPES.join(",")}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (!f) {
+                  setImage(null);
+                  return;
+                }
+                if (!ACCEPTED_IMAGE_TYPES.includes(f.type)) {
+                  setImage(null);
+                  if (fileInputRef.current) fileInputRef.current.value = "";
+                  toastError(
+                    "Invalid file type. Only JPEG and PNG are allowed."
+                  );
+                  return;
+                }
+                setImage(f);
+              }}
+              className="mt-1"
+              style={{
+                backgroundColor: "#2a2f36",
+                borderColor: "#3a3f46",
+                color: "#ffffff",
+              }}
+            />
+          </div>
+
+          {/* Comment */}
+          <div className="md:col-span-2">
+            <Label style={{ color: "#fcd535" }}>Comment</Label>
+            <Textarea
+              id="comment"
+              value={form.comment || ""}
+              onChange={(e) => setField("comment", e.target.value)}
+              placeholder="Comment"
+              className="mt-1"
+              style={{
+                backgroundColor: "#2a2f36",
+                borderColor: "#3a3f46",
+                color: "#ffffff",
+              }}
+            />
+          </div>
+
+          {/* Status (only when NOT ATS auto) */}
+          {/* {!depositWithdrawAtsSystem && ( */}
+            <div className="md:col-span-2">
+              <Label style={{ color: "#fcd535" }}>
+                Status <span className="text-red-500">*</span>
+              </Label>
+              <div className="mt-2 flex items-center gap-6 text-white">
+                <label className="inline-flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="status"
+                    value="1"
+                    checked={form.status === 1}
+                    onChange={() => setField("status", 1)}
+                  />
+                  Approved
+                </label>
+                <label className="inline-flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="status"
+                    value="3"
+                    checked={form.status === 3}
+                    onChange={() => setField("status", 3)}
+                  />
+                  Dis-Approved
+                </label>
+              </div>
+            </div>
+          {/* )} */}
+        </div>
+
+        <Separator className="my-4" style={{ backgroundColor: "#3a3f46" }} />
+
+        <DialogFooter>
+          <Button
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            style={{ backgroundColor: "#fcd535", color: "#181a20" }}
+          >
+            {isSubmitting ? "Submitting…" : "Submit"}
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={() => {
+              resetForm();
+              onOpenChange(false);
+            }}
+          >
+            Cancel
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
